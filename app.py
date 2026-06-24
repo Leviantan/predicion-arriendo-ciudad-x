@@ -23,59 +23,61 @@ st.set_page_config(
 )
 
 # ============================================================
-# ESTILO MINIMALISTA
+# ESTILO MINIMALISTA LEGIBLE
 # ============================================================
 
 st.markdown("""
 <style>
     .stApp {
-        background-color: #0b1220;
-        color: #e5e7eb;
+        background-color: #f5f7fb;
+        color: #111827;
         font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
     }
 
     .block-container {
         padding-top: 2rem;
         padding-bottom: 2rem;
-        max-width: 1200px;
+        max-width: 1100px;
     }
 
     /* HEADER */
     .title-card {
-        background: #111827;
-        border: 1px solid #1f2937;
-        padding: 1.8rem;
+        background: white;
+        border: 1px solid #e5e7eb;
+        padding: 1.5rem;
         border-radius: 14px;
         text-align: center;
         margin-bottom: 1.5rem;
+        box-shadow: 0 1px 8px rgba(0,0,0,0.05);
     }
 
     .title-card h1 {
-        font-size: 2rem;
+        font-size: 1.8rem;
         margin: 0;
-        color: #f9fafb;
+        color: #111827;
     }
 
     .title-card p {
         margin-top: 0.4rem;
-        color: #9ca3af;
+        color: #6b7280;
         font-size: 0.95rem;
     }
 
     /* INFO BOX */
     .info-box {
-        background: #111827;
-        border: 1px solid #1f2937;
+        background: white;
+        border: 1px solid #e5e7eb;
         padding: 1rem;
         border-radius: 12px;
         margin-bottom: 1rem;
-        color: #e5e7eb;
+        color: #111827;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.04);
     }
 
     /* METRIC CARDS */
     .metric-card {
-        background: #111827;
-        border: 1px solid #1f2937;
+        background: white;
+        border: 1px solid #e5e7eb;
         border-radius: 12px;
         padding: 1rem;
         text-align: center;
@@ -84,19 +86,19 @@ st.markdown("""
     .metric-card h4 {
         font-size: 1.4rem;
         margin: 0.2rem 0;
-        color: #f9fafb;
+        color: #111827;
     }
 
     .metric-card p {
         margin: 0;
-        color: #9ca3af;
+        color: #6b7280;
         font-size: 0.85rem;
     }
 
     /* PREDICCIÓN */
     .prediction-card {
-        background: #0f172a;
-        border: 1px solid #334155;
+        background: #f0fdf4;
+        border: 1px solid #bbf7d0;
         padding: 1.5rem;
         border-radius: 14px;
         text-align: center;
@@ -106,22 +108,22 @@ st.markdown("""
     .prediction-card h1 {
         font-size: 2.2rem;
         margin: 0.5rem 0 0 0;
-        color: #22c55e;
+        color: #16a34a;
     }
 
     .prediction-card h2 {
         margin: 0;
         font-size: 1.1rem;
-        color: #e5e7eb;
+        color: #111827;
     }
 
     /* ERROR */
     .error-card {
-        background: #1f1b1b;
-        border: 1px solid #7f1d1d;
+        background: #fef2f2;
+        border: 1px solid #fecaca;
         padding: 1rem;
         border-radius: 12px;
-        color: #fca5a5;
+        color: #991b1b;
     }
 
     /* BOTÓN */
@@ -137,12 +139,13 @@ st.markdown("""
 
     div.stButton > button:hover {
         background: #1d4ed8;
+        color: white;
     }
 </style>
 """, unsafe_allow_html=True)
 
 # ============================================================
-# FUNCIONES
+# FUNCIONES AUXILIARES
 # ============================================================
 
 def formato_cop(valor):
@@ -178,7 +181,12 @@ def detectar_columna_prediccion(resultado, columnas_entrada):
     return None
 
 
+# ============================================================
+# DATAROBOT BATCH
+# ============================================================
+
 def hacer_prediccion_batch(df_input):
+
     batch_url = f"{DATAROBOT_HOST}/api/v2/batchPredictions/"
 
     headers_json = {
@@ -202,8 +210,8 @@ def hacer_prediccion_batch(df_input):
     upload_url = job["links"]["csvUpload"]
     job_url = job["links"]["self"]
 
-    csv_buffer = io.StringIO()
-    df_input.to_csv(csv_buffer, index=False)
+    buffer = io.StringIO()
+    df_input.to_csv(buffer, index=False)
 
     requests.put(
         upload_url,
@@ -211,7 +219,7 @@ def hacer_prediccion_batch(df_input):
             "Authorization": f"Token {DATAROBOT_API_KEY}",
             "Content-Type": "text/csv"
         },
-        data=csv_buffer.getvalue().encode("utf-8")
+        data=buffer.getvalue().encode("utf-8")
     )
 
     progress = st.progress(0)
@@ -232,15 +240,16 @@ def hacer_prediccion_batch(df_input):
         time.sleep(2)
 
     if status != "COMPLETED":
-        raise Exception(f"Job terminó en estado {status}")
+        raise Exception(f"Error en el job: {status}")
 
     download_url = job_data["links"]["download"]
 
     result = requests.get(download_url, headers={"Authorization": f"Token {DATAROBOT_API_KEY}"})
+
     df = pd.read_csv(io.StringIO(result.text))
 
     progress.progress(100)
-    status_text.success("Completado")
+    status_text.success("Predicción completada")
 
     return df
 
@@ -256,7 +265,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ============================================================
-# INPUTS
+# SIDEBAR
 # ============================================================
 
 with st.sidebar:
@@ -265,12 +274,16 @@ with st.sidebar:
     modo_demo = st.toggle("Modo demo", False)
 
     st.divider()
-    st.write("Variables: metros, habitaciones, baños, estrato")
+    st.write("Variables del modelo")
+
+# ============================================================
+# INPUTS
+# ============================================================
 
 col1, col2 = st.columns(2)
 
 with col1:
-    metros_cuadrados = st.slider("Metros", 10, 500, 70)
+    metros_cuadrados = st.slider("Metros cuadrados", 10, 500, 70)
     habitaciones = st.number_input("Habitaciones", 0, 20, 2)
 
 with col2:
@@ -279,7 +292,7 @@ with col2:
     calcular = st.button("Predecir")
 
 # ============================================================
-# DATA
+# DATAFRAME
 # ============================================================
 
 input_data = pd.DataFrame([{
@@ -309,7 +322,7 @@ if calcular:
 
     else:
         try:
-            with st.spinner("Consultando modelo..."):
+            with st.spinner("Consultando DataRobot..."):
                 resultado = hacer_prediccion_batch(input_data)
 
             col = detectar_columna_prediccion(resultado, list(input_data.columns))
@@ -329,9 +342,13 @@ if calcular:
         except Exception as e:
             st.markdown(f"""
             <div class="error-card">
-                Error: {str(e)}
+                {str(e)}
             </div>
             """, unsafe_allow_html=True)
+
+# ============================================================
+# FOOTER
+# ============================================================
 
 st.markdown("---")
 st.caption("Streamlit + DataRobot")
